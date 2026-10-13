@@ -15,18 +15,21 @@ uv run pipeline-tui /path/to/webui/.pipeline-runs
 ```
 
 Keys: `a` all runs · `Enter` open · `Esc` back · `r` reload · `q` quit. Screens reload every 5 s.
+In all runs, `f` steps the filter through the outcomes and `/` searches tickets and summaries;
+`Esc` clears the search, then the filter.
 
 ## Screens
 
 - **Home** — the current batch with its progress, statistics for the last day, week and all time
   (outcomes, review and app-test quality, runs per day), the server's disk, worktrees and device
   mock, and the runs that need a look.
-- **All runs** — every run grouped by day: start, duration, verdict, PR.
+- **All runs** — every run grouped by day: ticket summary, start, duration, verdict, PR.
 - **A run** — its `state.md` and each stage's report.
 
 ## What it reads
 
-- `.pipeline-runs/<TICKET>/run-<N>/` — `00-assignment.md`, `<NN>-<stage>.md`, `state.md`
+- `.pipeline-runs/<TICKET>/run-<N>/` — `00-assignment.md` (its `- Summary:` line names the
+  ticket), `<NN>-<stage>.md`, `state.md`
 - `.pipeline-runs/batch-*/summary.tsv` and the tmux session `pipeline`
 - `.claude/worktrees/` next to `.pipeline-runs`, and the mock at `https://127.0.0.1:8888`
 

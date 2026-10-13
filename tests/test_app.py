@@ -6,7 +6,7 @@ from pathlib import Path
 from rich.console import Console
 from textual.widgets import DataTable, Markdown, Static
 
-from conftest import write
+from conftest import ASSIGNMENT, write
 from pipeline_tui.app import RunsApp
 from pipeline_tui.batch import TmuxSession
 from pipeline_tui.home import HomeScreen
@@ -90,8 +90,10 @@ def test_table_shows_each_run_with_its_outcome(runs_root: Path) -> None:
 
             assert [str(row[0]) for row in rows] == ["Fri 02 Oct", "XYZ-2", "Thu 01 Oct", "ABC-1"]
             assert labels == ["", "1", "", "2"]
-            assert (rows[3][2], rows[3][3], rows[3][4], rows[3][5]) == ("10:00", "1h 15m", "done:pr-opened", "#545")
-            assert rows[1][4] == "unfinished"
+            assert tuple(rows[3][1:]) == (
+                "Ports table sorts by the wrong column", "1", "10:00", "1h 15m", "done:pr-opened", "#545"
+            )
+            assert (rows[1][1], rows[1][5]) == ("", "unfinished")
             # The cursor starts on the first run, not on its day row.
             assert table.cursor_row == 1
 
@@ -130,7 +132,7 @@ def test_enter_opens_the_run_and_escape_goes_back(runs_root: Path) -> None:
 
             assert isinstance(app.screen, RunScreen)
             assert "done:pr-opened" in text_of(app.screen.query_one("#state", Static))
-            assert app.screen.query_one(Markdown).source == "# ABC-1 — run 1 assignment"
+            assert app.screen.query_one(Markdown).source == ASSIGNMENT
 
             await pilot.press("escape")
             assert isinstance(app.screen, RunsScreen)
@@ -152,5 +154,59 @@ def test_server_block_shows_worktrees_and_a_silent_mock(runs_root: Path) -> None
             text = text_of(block)
             assert "1 · 1 with node_modules" in text
             assert "not answering" in text
+
+    asyncio.run(scenario())
+
+
+def tickets_in(table: DataTable) -> list[str]:
+    """The tickets of the run rows, leaving out the day rows."""
+    return [str(table.get_row(key)[0]) for key in table.rows if not key.value.startswith("day:")]
+
+
+def test_filter_steps_through_outcomes_and_escape_clears_it(runs_root: Path) -> None:
+    async def scenario() -> None:
+        app = RunsApp(runs_root, read_session=no_session, mock_url=NO_MOCK)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            table = app.screen.query_one(DataTable)
+            assert tickets_in(table) == ["XYZ-2", "ABC-1"]
+
+            await pilot.press("f")
+            await pilot.pause()
+            assert tickets_in(table) == ["ABC-1"]
+            assert app.screen.title == "All runs · PR opened"
+
+            # PR opened → nothing to build → blocked → unfinished.
+            await pilot.press("f", "f", "f")
+            await pilot.pause()
+            assert tickets_in(table) == ["XYZ-2"]
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, RunsScreen)
+            assert tickets_in(table) == ["XYZ-2", "ABC-1"]
+
+    asyncio.run(scenario())
+
+
+def test_search_matches_the_summary_and_escape_clears_it(runs_root: Path) -> None:
+    async def scenario() -> None:
+        app = RunsApp(runs_root, read_session=no_session, mock_url=NO_MOCK)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            table = app.screen.query_one(DataTable)
+
+            # "r" is the refresh key, yet it goes into the search; case does not matter.
+            await pilot.press("slash", *"SoRts", "enter")
+            await pilot.pause()
+            assert tickets_in(table) == ["ABC-1"]
+            assert app.screen.title == "All runs · “SoRts”"
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert tickets_in(table) == ["XYZ-2", "ABC-1"]
+            assert isinstance(app.screen, RunsScreen)
 
     asyncio.run(scenario())

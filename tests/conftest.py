@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+ASSIGNMENT = "# ABC-1 — run 1 assignment\n\n- Ticket: ABC-1\n- Summary: Ports table sorts by the wrong column\n"
+
 FINISHED_STATE = """\
 01 investigate (ticket-investigator, -): confidence medium
 02 implement (ticket-implementer, implement): done
@@ -25,7 +27,7 @@ def runs_root(tmp_path: Path) -> Path:
     # The main checkout is tmp_path, as .pipeline-runs sits in the webui main checkout.
     root = tmp_path / ".pipeline-runs"
     done = root / "ABC-1" / "run-1"
-    write(done / "00-assignment.md", "# ABC-1 — run 1 assignment", datetime(2026, 10, 1, 10, 0))
+    write(done / "00-assignment.md", ASSIGNMENT, datetime(2026, 10, 1, 10, 0))
     write(done / "01-investigate.md", "# investigate", datetime(2026, 10, 1, 11, 0))
     write(done / "02-implement.md", "# implement", datetime(2026, 10, 1, 11, 0))
     write(done / "03-review.md", "# review", datetime(2026, 10, 1, 11, 0))

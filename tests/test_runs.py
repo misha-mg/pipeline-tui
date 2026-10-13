@@ -56,3 +56,26 @@ def test_hand_written_state_still_yields_its_pr_and_stages(tmp_path: Path) -> No
     assert run.pr == "https://bitbucket.org/example/webui/pull-requests/525"
     assert [stage.name for stage in run.stages] == ["investigate", "review", "pull-request"]
     assert run.stages[1].result == " · change-reviewer · pass (3 nits)"
+
+
+def test_summary_comes_from_the_assignment_else_from_the_investigation(tmp_path: Path) -> None:
+    new = tmp_path / "ABC-1" / "run-1"
+    new.mkdir(parents=True)
+    (new / "00-assignment.md").write_text("# ABC-1\n\n- Ticket: ABC-1\n- Summary: Ports table sorts wrong\n")
+    old = tmp_path / "ABC-2" / "run-1"
+    old.mkdir(parents=True)
+    (old / "00-assignment.md").write_text("# ABC-2\n\n- Ticket: ABC-2\n")
+    (old / "01-investigate.md").write_text(
+        '## Ticket\n\nABC-2, Bug. Summary: "Read "Resources" from the \\"DOM\\"". Labels: UI\n'
+    )
+    unknown = tmp_path / "ABC-3" / "run-1"
+    unknown.mkdir(parents=True)
+    (unknown / "01-investigate.md").write_text('## Ticket\n\nABC-3, Bug, "No label marks this title"\n')
+
+    summaries = {run.ticket: run.summary for run in load_runs(tmp_path)}
+
+    assert summaries == {
+        "ABC-1": "Ports table sorts wrong",
+        "ABC-2": 'Read "Resources" from the "DOM"',
+        "ABC-3": None,
+    }

@@ -6,6 +6,10 @@ starts, and the stage reports (`<NN>-<stage>.md`) together with `state.md` only 
 last line. Older runs wrote `state.md` by hand, so a stage line may start with `01 `, `01-` or
 nothing, and the PR's URL may sit anywhere.
 
+The ticket's summary is a `- Summary: ` line in `00-assignment.md`. Runs from before that line
+existed have it only in the investigation report, worded freely; it is taken from there when a
+`Summary:` label marks it, and is otherwise unknown.
+
 An unfinished run has no stage reports yet, and the files cannot tell a run still going from one
 that was interrupted.
 """
@@ -21,6 +25,9 @@ _TICKET = re.compile(r"[A-Z]+-\d+")
 _RUN = re.compile(r"run-(\d+)")
 _REPORT = re.compile(r"\d\d-.+\.md")
 _PR = re.compile(r"https://bitbucket\.org/\S+?/pull-requests/\d+")
+_SUMMARY = re.compile(r"(?:\*\*)?Summary:(?:\*\*)?[ \t]*(.+)")
+# A quoted summary runs to the line's last quote: quotes inside it may or may not be escaped.
+_QUOTED = re.compile(r'"(.*)"')
 _STAGE = re.compile(r"(?:\d\d[ -])?(investigate|diff|implement|review|app-test|pull-request)\b(.*)", re.IGNORECASE)
 
 
@@ -43,6 +50,8 @@ class Run:
     state: str | None
     # 00-assignment.md and the stage reports, in the order they were written.
     reports: tuple[Path, ...]
+    # The ticket's Jira summary; None when the run's files do not give it.
+    summary: str | None = None
 
     @property
     def verdict(self) -> str | None:
@@ -90,7 +99,17 @@ def _load_run(path: Path, ticket: str, number: int) -> Run:
         finished=_mtime(state_file) if has_state else None,
         state=state_file.read_text() if has_state else None,
         reports=tuple(sorted(p for p in path.iterdir() if _REPORT.fullmatch(p.name))),
+        summary=_summary(assignment) or _summary(path / "01-investigate.md"),
     )
+
+
+def _summary(report: Path) -> str | None:
+    match = _SUMMARY.search(report.read_text()) if report.exists() else None
+    if not match:
+        return None
+    text = match.group(1).strip()
+    quoted = _QUOTED.match(text)
+    return quoted.group(1).replace('\\"', '"') if quoted else text
 
 
 def _mtime(path: Path) -> datetime:
