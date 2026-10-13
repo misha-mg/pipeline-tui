@@ -2,32 +2,40 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.content import Content
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Markdown, Static
 
+from .fmt import span
 from .runs import Run
 
 
 class RunScreen(Screen):
-    """One run: its state.md on top, its reports on the left, the chosen report on the right."""
+    """One run: a summary on top, its documents on the left, the chosen document on the right."""
 
     BINDINGS = [("escape", "app.pop_screen", "Back")]
     DEFAULT_CSS = """
-    RunScreen #state { padding: 0 1; border-bottom: solid $primary; }
+    RunScreen #summary { padding: 1 2; border-bottom: solid $primary; }
     RunScreen ListView { width: 28; border-right: solid $primary; }
     """
 
     def __init__(self, run: Run) -> None:
         super().__init__()
         self._run = run
+        # The reports, then state.md: the summary above is drawn from it, the file has the rest.
+        state = run.path / "state.md"
+        self._documents: tuple[Path, ...] = run.reports + ((state,) if run.state is not None else ())
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(self._run.state or "No state.md yet: the run is still going, or was interrupted.", id="state", markup=False)
+        yield Static(_summary(self._run, datetime.now()), id="summary")
         with Horizontal():
-            yield ListView(*(ListItem(Label(report.name)) for report in self._run.reports))
+            yield ListView(*(ListItem(Label(document.name)) for document in self._documents))
             with VerticalScroll():
                 yield Markdown()
         yield Footer()
@@ -36,5 +44,26 @@ class RunScreen(Screen):
         self.title = f"{self._run.ticket} · run {self._run.number}"
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        if event.list_view.index is not None:
-            await self.query_one(Markdown).update(self._run.reports[event.list_view.index].read_text())
+        if event.list_view.index is None:
+            return
+        document = self._documents[event.list_view.index]
+        text = document.read_text()
+        # state.md is one fact per line, not Markdown: as Markdown its lines would run together.
+        await self.query_one(Markdown).update(f"```\n{text}\n```" if document.name == "state.md" else text)
+
+
+def _summary(run: Run, now: datetime) -> Content:
+    if run.duration is None:
+        time = f"started {run.started:%d %b %H:%M} · {span(now - run.started)} ago, no result yet"
+    else:
+        time = f"{run.started:%d %b %H:%M} · took {span(run.duration)}"
+    rows = [
+        ("Ticket", f"{run.ticket} · {run.summary}" if run.summary else run.ticket),
+        ("Verdict", run.verdict or "unfinished"),
+        ("Time", time),
+        ("Reviews", str(sum(stage.name == "review" for stage in run.stages))),
+        ("PR", run.pr or "–"),
+    ]
+    if run.reason:
+        rows.append(("Reason", run.reason))
+    return Content("\n").join(Content.assemble((f"{label:<9}", "bold"), value) for label, value in rows)

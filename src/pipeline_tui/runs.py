@@ -25,6 +25,7 @@ _TICKET = re.compile(r"[A-Z]+-\d+")
 _RUN = re.compile(r"run-(\d+)")
 _REPORT = re.compile(r"\d\d-.+\.md")
 _PR = re.compile(r"https://bitbucket\.org/\S+?/pull-requests/\d+")
+_REASON = re.compile(r"^reason: (.+)$", re.MULTILINE)
 _SUMMARY = re.compile(r"(?:\*\*)?Summary:(?:\*\*)?[ \t]*(.+)")
 # A quoted summary runs to the line's last quote: quotes inside it may or may not be escaped.
 _QUOTED = re.compile(r'"(.*)"')
@@ -61,6 +62,12 @@ class Run:
     def pr(self) -> str | None:
         match = _PR.search(self.state or "")
         return match.group(0) if match else None
+
+    @property
+    def reason(self) -> str | None:
+        """Why the run ended as it did, when state.md says: a blocked run's cause, say."""
+        match = _REASON.search(self.state or "")
+        return match.group(1) if match else None
 
     @property
     def stages(self) -> tuple[Stage, ...]:

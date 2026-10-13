@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from rich.console import Console
-from textual.widgets import DataTable, Markdown, Static
+from textual.widgets import DataTable, Label, Markdown, Static
 
 from conftest import ASSIGNMENT, write
 from pipeline_tui.app import RunsApp
@@ -60,7 +60,7 @@ def test_home_opens_a_run_that_needs_attention(runs_root: Path) -> None:
     # The fixture's runs are older than the attention block's week; this one is from today.
     blocked = runs_root / "ABC-5" / "run-1"
     write(blocked / "00-assignment.md", "# ABC-5", datetime.now())
-    write(blocked / "state.md", "blocked:tooling\n", datetime.now())
+    write(blocked / "state.md", "reason: the mock did not answer\nblocked:tooling\n", datetime.now())
 
     async def scenario() -> None:
         app = RunsApp(runs_root, read_session=no_session, mock_url=NO_MOCK)
@@ -72,7 +72,9 @@ def test_home_opens_a_run_that_needs_attention(runs_root: Path) -> None:
             await pilot.press("enter")
             await pilot.pause()
             assert isinstance(app.screen, RunScreen)
-            assert "blocked:tooling" in text_of(app.screen.query_one("#state", Static))
+            summary = text_of(app.screen.query_one("#summary", Static))
+            assert "blocked:tooling" in summary
+            assert "Reason   the mock did not answer" in summary
 
     asyncio.run(scenario())
 
@@ -131,7 +133,14 @@ def test_enter_opens_the_run_and_escape_goes_back(runs_root: Path) -> None:
             await pilot.pause()
 
             assert isinstance(app.screen, RunScreen)
-            assert "done:pr-opened" in text_of(app.screen.query_one("#state", Static))
+            summary = text_of(app.screen.query_one("#summary", Static))
+            assert "ABC-1 · Ports table sorts by the wrong column" in summary
+            assert "01 Oct 10:00 · took 1h 15m" in summary
+            assert "Reviews  1" in summary
+            assert "https://bitbucket.org/example/webui/pull-requests/545" in summary
+            assert "Reason" not in summary
+            documents = [str(label.content) for label in app.screen.query(Label)]
+            assert documents[-1] == "state.md"
             assert app.screen.query_one(Markdown).source == ASSIGNMENT
 
             await pilot.press("escape")

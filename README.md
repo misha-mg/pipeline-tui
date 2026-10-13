@@ -24,7 +24,8 @@ In all runs, `f` steps the filter through the outcomes and `/` searches tickets 
   (outcomes, review and app-test quality, runs per day), the server's disk, worktrees and device
   mock, and the runs that need a look.
 - **All runs** — every run grouped by day: ticket summary, start, duration, verdict, PR.
-- **A run** — its `state.md` and each stage's report.
+- **A run** — ticket and summary, verdict, time, review rounds, PR and, when the run gives one,
+  the reason it ended; below, each stage's report and `state.md`.
 
 ## What it reads
 
