@@ -1,0 +1,16 @@
+[project]
+name = "pipeline-tui"
+version = "0.1.0"
+description = "Terminal view of the webui ticket-pipeline runs"
+requires-python = ">=3.10"
+dependencies = ["textual>=1.0"]
+
+[project.scripts]
+pipeline-tui = "pipeline_tui.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
