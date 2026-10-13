@@ -10,7 +10,7 @@ run.
 Needs [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/<you>/pipeline-tui && cd pipeline-tui
+git clone https://github.com/misha-mg/pipeline-tui && cd pipeline-tui
 uv run pipeline-tui /path/to/webui/.pipeline-runs
 ```
 
