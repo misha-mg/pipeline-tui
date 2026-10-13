@@ -27,21 +27,33 @@ def outcome(verdict: str) -> Outcome:
 
 
 @dataclass(frozen=True)
+class Share:
+    """count of total; with a handful of runs a percentage alone says little, so both are kept."""
+
+    count: int
+    total: int
+
+    @property
+    def ratio(self) -> float | None:
+        return self.count / self.total if self.total else None
+
+
+@dataclass(frozen=True)
 class Stats:
     # Tickets with a finished run; each counts once, by the verdict of its latest finished run.
     tickets: int
     # Over every finished run, retries included.
     average_run: timedelta | None
-    pr_opened: float
-    nothing_to_build: float
-    blocked: float
+    pr_opened: Share
+    nothing_to_build: Share
+    blocked: Share
     # The rest is over runs, retries included: of the runs that got a review, those whose first
-    # review passed; the average rework rounds of the runs that implemented; and of the runs that
-    # reached the app test, how their last app test ended. None where no run qualifies.
-    first_review_passed: float | None
+    # review passed; the average rework rounds of the runs that implemented (None when none did);
+    # and of the runs that reached the app test, how their last app test ended.
+    first_review_passed: Share
     rework_rounds: float | None
-    app_test_passed: float | None
-    app_test_unverified: float | None
+    app_test_passed: Share
+    app_test_unverified: Share
 
 
 def ticket_stats(runs: list[Run], since: datetime | None = None) -> Stats:
@@ -50,20 +62,17 @@ def ticket_stats(runs: list[Run], since: datetime | None = None) -> Stats:
     outcomes = Counter(outcome(r.verdict or "") for r in _latest_per_ticket(finished))
     tickets = sum(outcomes.values())
 
-    def share(kind: Outcome) -> float:
-        return outcomes[kind] / tickets if tickets else 0.0
-
     return Stats(
         tickets=tickets,
         average_run=sum((r.duration for r in finished), timedelta()) / len(finished) if finished else None,
-        pr_opened=share(Outcome.PR_OPENED),
-        nothing_to_build=share(Outcome.NOTHING_TO_BUILD),
-        blocked=share(Outcome.BLOCKED),
+        pr_opened=Share(outcomes[Outcome.PR_OPENED], tickets),
+        nothing_to_build=Share(outcomes[Outcome.NOTHING_TO_BUILD], tickets),
+        blocked=Share(outcomes[Outcome.BLOCKED], tickets),
         **_quality([r.stages for r in finished]),
     )
 
 
-def _quality(runs: list[tuple[Stage, ...]]) -> dict[str, float | None]:
+def _quality(runs: list[tuple[Stage, ...]]) -> dict[str, Share | float | None]:
     first_reviews = [next((s.result for s in stages if s.name == "review"), "") for stages in runs]
     # A review that errored out (a usage limit, say) judged nothing: it counts neither way.
     verdicts = [result for result in first_reviews if "pass" in result or "fail" in result]
@@ -71,14 +80,11 @@ def _quality(runs: list[tuple[Stage, ...]]) -> dict[str, float | None]:
     app_tests = [[s for s in stages if s.name == "app-test"] for stages in runs]
     last_app_tests = [_app_test(tests[-1]) for tests in app_tests if tests]
 
-    def mean(values: list[float]) -> float | None:
-        return sum(values) / len(values) if values else None
-
     return {
-        "first_review_passed": mean([float("pass" in result) for result in verdicts]),
-        "rework_rounds": mean([n - 1.0 for n in implements]),
-        "app_test_passed": mean([float(a == "passed") for a in last_app_tests]),
-        "app_test_unverified": mean([float(a == "unverified") for a in last_app_tests]),
+        "first_review_passed": Share(sum("pass" in result for result in verdicts), len(verdicts)),
+        "rework_rounds": sum(n - 1 for n in implements) / len(implements) if implements else None,
+        "app_test_passed": Share(last_app_tests.count("passed"), len(last_app_tests)),
+        "app_test_unverified": Share(last_app_tests.count("unverified"), len(last_app_tests)),
     }
 
 

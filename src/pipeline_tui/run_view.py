@@ -11,6 +11,7 @@ from textual.content import Content
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Markdown, Static
 
+from .bitbucket import PullRequest
 from .fmt import span
 from .runs import Run
 
@@ -33,7 +34,8 @@ class RunScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(_summary(self._run, datetime.now()), id="summary")
+        pr = self.app.pull_requests.get(self._run.pr) if self._run.pr else None
+        yield Static(_summary(self._run, pr, datetime.now()), id="summary")
         with Horizontal():
             yield ListView(*(ListItem(Label(document.name)) for document in self._documents))
             with VerticalScroll():
@@ -52,7 +54,7 @@ class RunScreen(Screen):
         await self.query_one(Markdown).update(f"```\n{text}\n```" if document.name == "state.md" else text)
 
 
-def _summary(run: Run, now: datetime) -> Content:
+def _summary(run: Run, pr: PullRequest | None, now: datetime) -> Content:
     if run.duration is None:
         time = f"started {run.started:%d %b %H:%M} · {span(now - run.started)} ago, no result yet"
     else:
@@ -62,7 +64,7 @@ def _summary(run: Run, now: datetime) -> Content:
         ("Verdict", run.verdict or "unfinished"),
         ("Time", time),
         ("Reviews", str(sum(stage.name == "review" for stage in run.stages))),
-        ("PR", run.pr or "–"),
+        ("PR", f"{run.pr} · {pr.fate.value}" if pr else run.pr or "–"),
     ]
     if run.reason:
         rows.append(("Reason", run.reason))

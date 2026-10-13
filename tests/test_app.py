@@ -7,9 +7,12 @@ from rich.console import Console
 from textual.widgets import DataTable, Label, Markdown, Static
 
 from conftest import ASSIGNMENT, write
+from test_bitbucket import FakeApi, update
 from pipeline_tui.app import RunsApp
 from pipeline_tui.batch import TmuxSession
+from pipeline_tui.bitbucket import Bitbucket, PullRequests
 from pipeline_tui.home import HomeScreen
+from pipeline_tui.pr_screen import PullRequestsScreen
 from pipeline_tui.run_view import RunScreen
 from pipeline_tui.server_block import ServerBlock
 from pipeline_tui.table import RunsScreen
@@ -45,7 +48,7 @@ def test_home_shows_the_running_batch_and_the_statistics(runs_root: Path) -> Non
             assert "1 of 3 tickets done" in batch
             assert "XYZ-2" in batch and "ABC-3" in batch
             stats = text_of(app.screen.query_one("#stats", Static))
-            assert "Tickets" in stats and "100%" in stats
+            assert "Tickets" in stats and "100% (1)" in stats
             assert "First review passed" in stats
             # The fixture's only finished run started on 1 October.
             assert "Last day" in stats and "01 Oct" in stats and "01 Oct–" in stats
@@ -217,5 +220,41 @@ def test_search_matches_the_summary_and_escape_clears_it(runs_root: Path) -> Non
             await pilot.pause()
             assert tickets_in(table) == ["XYZ-2", "ABC-1"]
             assert isinstance(app.screen, RunsScreen)
+
+    asyncio.run(scenario())
+
+
+def test_pull_requests_screen_fetches_the_runs_pull_requests_and_counts_their_fates(runs_root: Path, tmp_path: Path) -> None:
+    api = FakeApi()
+    api.add(545, "MERGED", [update("MERGED", "a", "2026-10-02T10:00:00.000000+00:00"), update("OPEN", "a", "2026-10-01T10:00:00.000000+00:00")])
+    pull_requests = PullRequests(tmp_path / "cache.json", Bitbucket("secret", api))
+
+    async def scenario() -> None:
+        app = RunsApp(runs_root, read_session=no_session, mock_url=NO_MOCK, pull_requests=pull_requests)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.press("p")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert isinstance(app.screen, PullRequestsScreen)
+            fates = text_of(app.screen.query_one("#fates", Static))
+            assert "Merged as is" in fates and "100% (1)" in fates
+            table = app.screen.query_one(DataTable)
+            assert [str(cell) for cell in table.get_row_at(0)][:4] == ["ABC-1", "Ports table sorts by the wrong column", "#545", "merged as is"]
+
+            await pilot.press("enter")
+            await pilot.pause()
+            assert "bitbucket.org/example/webui/pull-requests/545 · merged as is" in text_of(app.screen.query_one("#summary", Static))
+
+    asyncio.run(scenario())
+
+
+def test_pull_requests_screen_without_a_token_says_how_to_connect(runs_root: Path) -> None:
+    async def scenario() -> None:
+        app = RunsApp(runs_root, read_session=no_session, mock_url=NO_MOCK)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.press("p")
+            await pilot.pause()
+            assert "BITBUCKET_TOKEN" in text_of(app.screen.query_one("#note", Static))
+            assert "Not fetched yet" in text_of(app.screen.query_one("#fates", Static))
 
     asyncio.run(scenario())

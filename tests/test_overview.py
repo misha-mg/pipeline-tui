@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from pipeline_tui.overview import Outcome, last_active_day, needs_attention, runs_per_day, ticket_stats
+from pipeline_tui.overview import Outcome, Share, last_active_day, needs_attention, runs_per_day, ticket_stats
 from pipeline_tui.runs import Run
 
 START = datetime(2026, 10, 1, 10, 0)
@@ -34,20 +34,20 @@ def test_tickets_count_once_by_their_latest_verdict_and_time_averages_every_run(
 
     assert stats.tickets == 3
     assert stats.average_run == timedelta(minutes=(2 + 20 + 30 + 10) / 4)
-    assert (stats.pr_opened, stats.nothing_to_build, stats.blocked) == (1 / 3, 1 / 3, 1 / 3)
+    assert (stats.pr_opened, stats.nothing_to_build, stats.blocked) == (Share(1, 3),) * 3
 
 
 def test_stats_since_leave_older_runs_out() -> None:
     stats = ticket_stats(RUNS, since=START + timedelta(hours=25))
 
     assert stats.tickets == 2
-    assert stats.blocked == 0
+    assert stats.blocked.count == 0
 
 
 def test_no_finished_runs_gives_empty_stats() -> None:
     stats = ticket_stats([run("ABC-4", 1, 0, None)])
 
-    assert (stats.tickets, stats.average_run, stats.pr_opened) == (0, None, 0.0)
+    assert (stats.tickets, stats.average_run, stats.pr_opened.ratio) == (0, None, None)
 
 
 def test_attention_lists_latest_blocked_and_unfinished_runs_not_running_now() -> None:
@@ -83,15 +83,15 @@ def test_quality_reads_reviews_reworks_and_the_last_app_test_of_each_run() -> No
     ]
     stats = ticket_stats(runs)
 
-    assert stats.first_review_passed == 1 / 2
+    assert stats.first_review_passed == Share(1, 2)
     assert stats.rework_rounds == (0 + 1 + 0) / 3
-    assert (stats.app_test_passed, stats.app_test_unverified) == (1 / 2, 1 / 2)
+    assert (stats.app_test_passed, stats.app_test_unverified) == (Share(1, 2), Share(1, 2))
 
 
 def test_quality_is_none_without_runs_that_got_that_far() -> None:
     stats = ticket_stats([stated("A-4", "investigate — x\ndone:nothing-to-build\n")])
 
-    assert (stats.first_review_passed, stats.rework_rounds, stats.app_test_passed) == (None, None, None)
+    assert (stats.first_review_passed.ratio, stats.rework_rounds, stats.app_test_passed.ratio) == (None, None, None)
 
 
 def test_last_active_day_is_the_latest_day_with_a_finished_run() -> None:

@@ -14,9 +14,10 @@ from textual.widgets import DataTable, Footer, Header, ProgressBar, Static
 
 from .batch import Batch, TmuxSession, load_batch
 from .chart import day_bars
-from .fmt import span
+from .fmt import share, span
 from .live import LiveScreen
 from .overview import Stats, last_active_day, needs_attention, runs_per_day, ticket_stats
+from .pr_screen import PullRequestsScreen
 from .run_view import RunScreen
 from .runs import Run, load_runs
 from .server_block import ServerBlock
@@ -28,11 +29,11 @@ CHART_HEIGHT = 6
 
 
 class HomeScreen(LiveScreen):
-    BINDINGS = [("a", "all_runs", "All runs")]
+    BINDINGS = [("a", "all_runs", "All runs"), ("p", "pull_requests", "Pull requests")]
     DEFAULT_CSS = """
     HomeScreen .block { border: round $primary; padding: 1 2; height: auto; }
-    /* The statistics block's height: table 12 + gap 1 + chart 8, padding 2, border 2. */
-    HomeScreen #top { height: 25; }
+    /* The statistics block's height: table 12 + gap 1 + chart 9, padding 2, border 2. */
+    HomeScreen #top { height: 26; }
     HomeScreen #top > .block { width: 1fr; height: 100%; }
     HomeScreen #chart { margin-top: 1; }
     HomeScreen #bottom { height: 1fr; }
@@ -83,6 +84,9 @@ class HomeScreen(LiveScreen):
 
     def action_all_runs(self) -> None:
         self.app.push_screen(RunsScreen(self._root))
+
+    def action_pull_requests(self) -> None:
+        self.app.push_screen(PullRequestsScreen(self._root, self.app.pull_requests))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self.app.push_screen(RunScreen(self._attention[event.row_key.value]))
@@ -144,14 +148,14 @@ def _stats_table(runs: list[Run], now: datetime) -> Table:
     rows: list[tuple[str, Callable[[Stats], str]]] = [
         ("Tickets", lambda s: str(s.tickets)),
         ("Average run", lambda s: span(s.average_run) if s.average_run else "–"),
-        ("PR opened", lambda s: f"{s.pr_opened:.0%}"),
-        ("Nothing to build", lambda s: f"{s.nothing_to_build:.0%}"),
-        ("Blocked", lambda s: f"{s.blocked:.0%}"),
+        ("PR opened", lambda s: share(s.pr_opened)),
+        ("Nothing to build", lambda s: share(s.nothing_to_build)),
+        ("Blocked", lambda s: share(s.blocked)),
         ("", lambda s: ""),
-        ("First review passed", lambda s: _share(s.first_review_passed)),
+        ("First review passed", lambda s: share(s.first_review_passed)),
         ("Rework rounds", lambda s: f"{s.rework_rounds:.1f}" if s.rework_rounds is not None else "–"),
-        ("App-test passed", lambda s: _share(s.app_test_passed)),
-        ("App-test unverified", lambda s: _share(s.app_test_unverified)),
+        ("App-test passed", lambda s: share(s.app_test_passed)),
+        ("App-test unverified", lambda s: share(s.app_test_unverified)),
     ]
     for label, cell in rows:
         table.add_row(label, *(cell(stats) for _, _, stats in columns))
@@ -160,7 +164,3 @@ def _stats_table(runs: list[Run], now: datetime) -> Table:
 
 def _date(day: date | None) -> str:
     return f"{day:%d %b}" if day else "–"
-
-
-def _share(value: float | None) -> str:
-    return f"{value:.0%}" if value is not None else "–"

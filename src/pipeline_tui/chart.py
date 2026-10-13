@@ -21,18 +21,26 @@ BAR = "██"
 
 
 def day_bars(days: list[tuple[date, Counter[Outcome]]], height: int) -> Content:
-    """One bar per day, scaled so the busiest day is height rows; day numbers below, legend last."""
+    """One bar per day, scaled so the busiest day is height rows, its run count just above it; day
+    numbers below, legend last."""
     top = max((sum(counts.values()) for _, counts in days), default=0)
-    gutter = len(str(top))
     columns = [_column(counts, top, height) for _, counts in days]
+    totals = [sum(counts.values()) for _, counts in days]
     lines = []
-    for row in reversed(range(height)):
-        label = str(top) if row == height - 1 and top else ""
-        parts: list[tuple[str, str] | str] = [label.rjust(gutter) + " "]
-        for column in columns:
-            parts += [(BAR, column[row]) if column[row] else "  ", " "]
+    # One row more than the bars: the busiest day's count sits above its full-height bar.
+    for row in reversed(range(height + 1)):
+        parts: list[tuple[str, str] | str] = []
+        for column, total in zip(columns, totals):
+            filled = height - column.count(None)
+            if row < filled:
+                parts.append((BAR, column[row]))
+            elif row == filled and total:
+                parts.append(str(total).rjust(len(BAR)))
+            else:
+                parts.append(" " * len(BAR))
+            parts.append(" ")
         lines.append(Content.assemble(*parts))
-    lines.append(Content(" " * (gutter + 1) + " ".join(f"{day:%d}" for day, _ in days)))
+    lines.append(Content(" ".join(f"{day:%d}" for day, _ in days)))
     lines.append(_legend(days))
     return Content("\n").join(lines)
 

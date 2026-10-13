@@ -4,12 +4,25 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from .overview import Share
 from .runs import Run
 
 
 def span(span: timedelta) -> str:
     minutes = int(span.total_seconds()) // 60
     return f"{minutes // 60}h {minutes % 60:02d}m" if minutes >= 60 else f"{minutes}m"
+
+
+def age(span_: timedelta) -> str:
+    """A span that may run to days: "3d 04h", or as span() under a day."""
+    if span_ < timedelta(days=1):
+        return span(span_)
+    return f"{span_.days}d {span_.seconds // 3600:02d}h"
+
+
+def share(share_: Share) -> str:
+    """"85% (11)": the percentage, and how many it is."""
+    return f"{share_.ratio:.0%} ({share_.count})" if share_.ratio is not None else "–"
 
 
 def pr_label(run: Run) -> str:

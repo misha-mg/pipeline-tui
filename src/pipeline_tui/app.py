@@ -8,6 +8,7 @@ from pathlib import Path
 from textual.app import App
 
 from .batch import TmuxSession, read_tmux_session
+from .bitbucket import PullRequests
 from .home import HomeScreen
 from .live import LiveScreen
 from .server import MOCK_URL
@@ -25,12 +26,15 @@ class RunsApp(App):
         root: Path,
         read_session: Callable[[], TmuxSession | None] = read_tmux_session,
         mock_url: str = MOCK_URL,
+        pull_requests: PullRequests | None = None,
     ) -> None:
         super().__init__()
         self.sub_title = str(root)
         self._root = root
         self._read_session = read_session
         self._mock_url = mock_url
+        # Every screen reads the pull requests from here; the PR screen also fetches them.
+        self.pull_requests = pull_requests or PullRequests()
 
     def get_default_screen(self) -> HomeScreen:
         return HomeScreen(self._root, self._read_session, self._mock_url)

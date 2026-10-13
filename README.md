@@ -14,7 +14,7 @@ git clone https://github.com/misha-mg/pipeline-tui && cd pipeline-tui
 uv run pipeline-tui /path/to/webui/.pipeline-runs
 ```
 
-Keys: `a` all runs · `Enter` open · `Esc` back · `r` reload · `q` quit. Screens reload every 5 s.
+Keys: `a` all runs · `p` pull requests · `Enter` open · `Esc` back · `r` reload · `q` quit. Screens reload every 5 s.
 In all runs, `f` steps the filter through the outcomes and `/` searches tickets and summaries;
 `Esc` clears the search, then the filter.
 
@@ -24,7 +24,10 @@ In all runs, `f` steps the filter through the outcomes and `/` searches tickets 
   (outcomes, review and app-test quality, runs per day), the server's disk, worktrees and device
   mock, and the runs that need a look.
 - **All runs** — every run grouped by day: ticket summary, start, duration, verdict, PR.
-- **A run** — ticket and summary, verdict, time, review rounds, PR and, when the run gives one,
+- **Pull requests** — what became of the runs' pull requests: merged as the pipeline pushed it,
+  merged with changes (someone pushed to it after it was opened), open, declined; with how long
+  each was open, its approvals, and the pushes after opening.
+- **A run** — ticket and summary, verdict, time, review rounds, PR and its state, and, when the run gives one,
   the reason it ended; below, each stage's report and `state.md`.
 
 ## What it reads
@@ -33,6 +36,10 @@ In all runs, `f` steps the filter through the outcomes and `/` searches tickets 
   ticket), `<NN>-<stage>.md`, `state.md`
 - `.pipeline-runs/batch-*/summary.tsv` and the tmux session `pipeline`
 - `.claude/worktrees/` next to `.pipeline-runs`, and the mock at `https://127.0.0.1:8888`
+- Bitbucket Cloud, for the pull requests' state: a token with read access to pull requests, from
+  `BITBUCKET_TOKEN` or `~/.config/pipeline-tui/bitbucket-token`. Without one that screen says so
+  and the rest works as before. Answers are cached in `~/.cache/pipeline-tui/`: a merged or
+  declined pull request is fetched once, an open one again after 10 minutes.
 
 ## Develop
 

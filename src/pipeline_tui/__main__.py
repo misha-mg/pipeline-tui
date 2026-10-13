@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from .app import RunsApp
+from .bitbucket import CACHE_FILE, Bitbucket, PullRequests, load_token
 
 
 def main() -> None:
@@ -16,7 +17,9 @@ def main() -> None:
     args = parser.parse_args()
     if not args.runs.is_dir():
         parser.error(f"not a directory: {args.runs}")
-    RunsApp(args.runs.resolve()).run()
+    token = load_token()
+    pull_requests = PullRequests(CACHE_FILE, Bitbucket(token) if token else None)
+    RunsApp(args.runs.resolve(), pull_requests=pull_requests).run()
 
 
 if __name__ == "__main__":
