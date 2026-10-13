@@ -1,11 +1,15 @@
-"""The app's colors: gruvbox, softened, with yellow for frames and pink for accents."""
+"""The app's colors: gruvbox, softened, with yellow for frames and pink for accents.
+
+The second color is aqua: the chart draws "nothing to build" in it, and pink sat too close to the
+red of "blocked" to tell them apart.
+"""
 
 from textual.theme import Theme
 
 GRUVBOX_SOFT = Theme(
     name="gruvbox-soft",
     primary="#d8a657",
-    secondary="#d3869b",
+    secondary="#7daea3",
     accent="#d3869b",
     warning="#e78a4e",
     error="#ea6962",
