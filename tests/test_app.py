@@ -44,6 +44,7 @@ def test_home_shows_the_running_batch_and_the_statistics(runs_root: Path) -> Non
         app = RunsApp(runs_root, read_session=lambda: BATCH, mock_url=NO_MOCK)
         async with app.run_test(size=(100, 40)):
             assert isinstance(app.screen, HomeScreen)
+            assert "██╗" in text_of(app.screen.query_one("#banner", Static))
             batch = text_of(app.screen.query_one("#batch", Static))
             assert "1 of 3 tickets done" in batch
             assert "XYZ-2" in batch and "ABC-3" in batch

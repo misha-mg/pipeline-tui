@@ -9,9 +9,11 @@ from pathlib import Path
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.color import Color
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, ProgressBar, Static
 
+from .banner import banner
 from .batch import Batch, TmuxSession, load_batch
 from .chart import day_bars
 from .fmt import share, span
@@ -31,6 +33,7 @@ CHART_HEIGHT = 6
 class HomeScreen(LiveScreen):
     BINDINGS = [("a", "all_runs", "All runs"), ("p", "pull_requests", "Pull requests")]
     DEFAULT_CSS = """
+    HomeScreen #banner { width: 100%; padding: 1 2 0 2; content-align: center top; text-wrap: nowrap; text-overflow: clip; }
     HomeScreen .block { border: round $primary; padding: 1 2; height: auto; }
     /* The statistics block's height: table 12 + gap 1 + chart 9, padding 2, border 2. */
     HomeScreen #top { height: 26; }
@@ -50,6 +53,7 @@ class HomeScreen(LiveScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Static(id="banner")
         with Horizontal(id="top"):
             # A long batch scrolls rather than stretching the row.
             with VerticalScroll(id="now", classes="block"):
@@ -67,6 +71,11 @@ class HomeScreen(LiveScreen):
         yield Footer()
 
     def on_mount(self) -> None:
+        theme = self.app.current_theme
+        background, foreground = Color.parse(theme.background), Color.parse(theme.foreground)
+        self.query_one("#banner", Static).update(
+            banner(Color.parse(theme.primary), Color.parse(theme.accent), background.blend(foreground, 0.45))
+        )
         self.query_one("#statistics").border_title = "Statistics"
         self.query_one("#attention-block").border_title = "Needs attention · 7 days"
         self.query_one("#attention", DataTable).add_columns("Ticket", "Run", "Started", "Verdict")
