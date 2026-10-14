@@ -51,8 +51,9 @@ def test_home_shows_the_running_batch_and_the_statistics(runs_root: Path) -> Non
             stats = text_of(app.screen.query_one("#stats", Static))
             assert "Tickets" in stats and "100% (1)" in stats
             assert "First review passed" in stats
-            # The batch started at 09:55; its ABC-1 finished, so 100% of one ticket opened a PR.
-            assert "Last batch" in stats and "01 Oct 09:55" in stats
+            # The batch started on 1 October; its ABC-1 finished, so 100% of one ticket opened a PR.
+            assert "01 Oct" in stats and "7 days" in stats and "30 days" in stats
+            assert "Last batch" not in stats and "09:55" not in stats
             assert "Outcomes · by ticket" in stats and "Quality · by run" in stats
             # Nothing in the fixture is from the last week.
             assert app.screen.query_one("#all-clear").display

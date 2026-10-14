@@ -36,8 +36,8 @@ class HomeScreen(LiveScreen):
     DEFAULT_CSS = """
     HomeScreen #banner { width: 100%; padding: 1 2 0 2; content-align: center top; text-wrap: nowrap; text-overflow: clip; }
     HomeScreen .block { border: round $primary; padding: 1 2; height: auto; }
-    /* The statistics block's height: table 15 + gap 1 + chart 9, padding 2, border 2. */
-    HomeScreen #top { height: 29; }
+    /* The statistics block's height: table 14 + gap 1 + chart 9, padding 2, border 2. */
+    HomeScreen #top { height: 28; }
     HomeScreen #top > .block { width: 1fr; height: 100%; }
     /* A month of bars, three columns a day. */
     HomeScreen #top > #statistics { width: 2fr; }
@@ -147,16 +147,16 @@ def _stats_table(runs: list[Run], batch: Batch | None, now: datetime, heading: s
     # The last batch's own tickets, from when it started: a manual run alongside it is not its.
     batch_runs = [r for r in runs if batch and r.ticket in batch.tickets]
     columns = [
-        ("Last batch", f"{batch.started:%d %b %H:%M}" if batch else "–", ticket_stats(batch_runs, batch.started if batch else None)),
-        ("Week", "7 days", ticket_stats(runs, now - WEEK)),
-        ("Month", f"{MONTH_DAYS} days", ticket_stats(runs, now - timedelta(days=MONTH_DAYS))),
+        # The last batch is headed by the day it started.
+        (f"{batch.started:%d %b}" if batch else "–", ticket_stats(batch_runs, batch.started if batch else None)),
+        ("7 days", ticket_stats(runs, now - WEEK)),
+        (f"{MONTH_DAYS} days", ticket_stats(runs, now - timedelta(days=MONTH_DAYS))),
     ]
     table = Table.grid(padding=(0, 3))
     table.add_column(no_wrap=True)
     for _ in columns:
         table.add_column(justify="right", no_wrap=True)
-    table.add_row("", *(Text(title, style="bold") for title, _, _ in columns))
-    table.add_row("", *(Text(note, style="dim") for _, note, _ in columns))
+    table.add_row("", *(Text(title, style="bold") for title, _ in columns))
     sections: list[tuple[str, list[tuple[str, Callable[[Stats], str]]]]] = [
         (
             "Outcomes · by ticket",
@@ -183,5 +183,5 @@ def _stats_table(runs: list[Run], batch: Batch | None, now: datetime, heading: s
             table.add_row("")
         table.add_row(Text(title, style=f"bold {heading}"))
         for label, cell in rows:
-            table.add_row(f"  {label}", *(cell(stats) for _, _, stats in columns))
+            table.add_row(f"  {label}", *(cell(stats) for _, stats in columns))
     return table
