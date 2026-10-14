@@ -97,11 +97,6 @@ def _app_test(stage: Stage) -> str:
     return "passed" if "pass" in result else "unverified"
 
 
-def last_active_day(runs: list[Run]) -> date | None:
-    """The latest day a finished run started on: today once a run has finished today."""
-    return max((r.started.date() for r in runs if r.duration is not None), default=None)
-
-
 def runs_per_day(runs: list[Run], last_day: date, days: int) -> list[tuple[date, Counter[Outcome]]]:
     """Finished runs (retries included) by the day they started and their outcome, oldest day first."""
     first_day = last_day - timedelta(days=days - 1)

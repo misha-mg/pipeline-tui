@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from rich.table import Table
@@ -18,7 +18,7 @@ from .batch import Batch, TmuxSession, load_batch
 from .chart import day_bars
 from .fmt import share, span
 from .live import LiveScreen
-from .overview import Stats, last_active_day, needs_attention, runs_per_day, ticket_stats
+from .overview import Stats, needs_attention, runs_per_day, ticket_stats
 from .pr_screen import PullRequestsScreen
 from .run_view import RunScreen
 from .runs import Run, load_runs
@@ -26,7 +26,8 @@ from .server_block import ServerBlock
 from .table import RunsScreen
 
 WEEK = timedelta(days=7)
-CHART_DAYS = 14
+# The statistics' longest period, and the chart's: the chart draws the same runs the table counts.
+MONTH_DAYS = 30
 CHART_HEIGHT = 6
 
 
@@ -35,12 +36,16 @@ class HomeScreen(LiveScreen):
     DEFAULT_CSS = """
     HomeScreen #banner { width: 100%; padding: 1 2 0 2; content-align: center top; text-wrap: nowrap; text-overflow: clip; }
     HomeScreen .block { border: round $primary; padding: 1 2; height: auto; }
-    /* The statistics block's height: table 12 + gap 1 + chart 9, padding 2, border 2. */
-    HomeScreen #top { height: 26; }
+    /* The statistics block's height: table 15 + gap 1 + chart 9, padding 2, border 2. */
+    HomeScreen #top { height: 29; }
     HomeScreen #top > .block { width: 1fr; height: 100%; }
+    /* A month of bars, three columns a day. */
+    HomeScreen #top > #statistics { width: 2fr; }
     HomeScreen #chart { margin-top: 1; }
     HomeScreen #bottom { height: 1fr; }
     HomeScreen #bottom > .block { width: 1fr; height: 100%; }
+    /* Under the blocks above, so their edges line up. */
+    HomeScreen #bottom > #attention-block { width: 2fr; }
     HomeScreen #attention { height: 1fr; }
     """
 
@@ -85,9 +90,9 @@ class HomeScreen(LiveScreen):
         batch = load_batch(self._root, self._read_session(), runs)
         now = datetime.now()
         self._show_batch(batch, now)
-        self.query_one("#stats", Static).update(_stats_table(runs, now))
-        self.query_one("#chart", Static).update(day_bars(runs_per_day(runs, now.date(), CHART_DAYS), CHART_HEIGHT))
-        self.query_one("#statistics").border_subtitle = f"runs per day · {CHART_DAYS} days"
+        self.query_one("#stats", Static).update(_stats_table(runs, batch, now, self.app.theme_variables["primary"]))
+        self.query_one("#chart", Static).update(day_bars(runs_per_day(runs, now.date(), MONTH_DAYS), CHART_HEIGHT))
+        self.query_one("#statistics").border_subtitle = f"runs per day · {MONTH_DAYS} days"
         running = {batch.current} if batch and batch.current else set()
         self._show_attention(needs_attention(runs, now - WEEK, running))
 
@@ -138,38 +143,45 @@ def _batch_text(batch: Batch, now: datetime) -> Text:
     return text
 
 
-def _stats_table(runs: list[Run], now: datetime) -> Table:
-    day = last_active_day(runs)
-    first = min((r.started.date() for r in runs if r.duration is not None), default=None)
+def _stats_table(runs: list[Run], batch: Batch | None, now: datetime, heading: str) -> Table:
+    # The last batch's own tickets, from when it started: a manual run alongside it is not its.
+    batch_runs = [r for r in runs if batch and r.ticket in batch.tickets]
     columns = [
-        # With no finished run yet, a day that has none gives empty stats.
-        ("Last day", _date(day), ticket_stats(runs, datetime.combine(day or now.date(), time.min))),
+        ("Last batch", f"{batch.started:%d %b %H:%M}" if batch else "–", ticket_stats(batch_runs, batch.started if batch else None)),
         ("Week", "7 days", ticket_stats(runs, now - WEEK)),
-        ("All time", f"{_date(first)}–", ticket_stats(runs)),
+        ("Month", f"{MONTH_DAYS} days", ticket_stats(runs, now - timedelta(days=MONTH_DAYS))),
     ]
-    # A half-width block fits the labels unwrapped and three columns of 8.
-    table = Table.grid(padding=(0, 2))
+    table = Table.grid(padding=(0, 3))
     table.add_column(no_wrap=True)
     for _ in columns:
-        table.add_column(justify="right")
+        table.add_column(justify="right", no_wrap=True)
     table.add_row("", *(Text(title, style="bold") for title, _, _ in columns))
     table.add_row("", *(Text(note, style="dim") for _, note, _ in columns))
-    rows: list[tuple[str, Callable[[Stats], str]]] = [
-        ("Tickets", lambda s: str(s.tickets)),
-        ("Average run", lambda s: span(s.average_run) if s.average_run else "–"),
-        ("PR opened", lambda s: share(s.pr_opened)),
-        ("Nothing to build", lambda s: share(s.nothing_to_build)),
-        ("Blocked", lambda s: share(s.blocked)),
-        ("", lambda s: ""),
-        ("First review passed", lambda s: share(s.first_review_passed)),
-        ("Rework rounds", lambda s: f"{s.rework_rounds:.1f}" if s.rework_rounds is not None else "–"),
-        ("App-test passed", lambda s: share(s.app_test_passed)),
-        ("App-test unverified", lambda s: share(s.app_test_unverified)),
+    sections: list[tuple[str, list[tuple[str, Callable[[Stats], str]]]]] = [
+        (
+            "Outcomes · by ticket",
+            [
+                ("Tickets", lambda s: str(s.tickets)),
+                ("Average run", lambda s: span(s.average_run) if s.average_run else "–"),
+                ("PR opened", lambda s: share(s.pr_opened)),
+                ("Nothing to build", lambda s: share(s.nothing_to_build)),
+                ("Blocked", lambda s: share(s.blocked)),
+            ],
+        ),
+        (
+            "Quality · by run",
+            [
+                ("First review passed", lambda s: share(s.first_review_passed)),
+                ("Rework rounds", lambda s: f"{s.rework_rounds:.1f}" if s.rework_rounds is not None else "–"),
+                ("App-test passed", lambda s: share(s.app_test_passed)),
+                ("App-test unverified", lambda s: share(s.app_test_unverified)),
+            ],
+        ),
     ]
-    for label, cell in rows:
-        table.add_row(label, *(cell(stats) for _, _, stats in columns))
+    for n, (title, rows) in enumerate(sections):
+        if n:
+            table.add_row("")
+        table.add_row(Text(title, style=f"bold {heading}"))
+        for label, cell in rows:
+            table.add_row(f"  {label}", *(cell(stats) for _, _, stats in columns))
     return table
-
-
-def _date(day: date | None) -> str:
-    return f"{day:%d %b}" if day else "–"

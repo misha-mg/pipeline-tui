@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from pipeline_tui.overview import Outcome, Share, last_active_day, needs_attention, runs_per_day, ticket_stats
+from pipeline_tui.overview import Outcome, Share, needs_attention, runs_per_day, ticket_stats
 from pipeline_tui.runs import Run
 
 START = datetime(2026, 10, 1, 10, 0)
@@ -93,8 +93,3 @@ def test_quality_is_none_without_runs_that_got_that_far() -> None:
 
     assert (stats.first_review_passed.ratio, stats.rework_rounds, stats.app_test_passed.ratio) == (None, None, None)
 
-
-def test_last_active_day_is_the_latest_day_with_a_finished_run() -> None:
-    # ABC-4's run on the 3rd is unfinished; ABC-3 finished a run that started on the 3rd.
-    assert last_active_day(RUNS) == date(2026, 10, 3)
-    assert last_active_day([run("ABC-4", 1, 0, None)]) is None
